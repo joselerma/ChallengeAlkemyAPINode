@@ -8,45 +8,53 @@ server.get("/", async (req, res) => {
   const { movies } = req.query;
 
   try {
-    if (name) {
-      const nombrePropio = nombreCapitalizado(name);
+    if (req.user) {
+      if (name) {
+        const nombrePropio = nombreCapitalizado(name);
 
-      const personaje = await Personaje.findOne({
-        where: { nombre: nombrePropio },
-        include: [{ model: Peliculaserie, as: "peliculaseries" }],
-      });
+        const personaje = await Personaje.findOne({
+          where: { nombre: nombrePropio },
+          include: [{ model: Peliculaserie, as: "peliculaseries" }],
+        });
 
-      if (personaje) {
-        return res.json(personaje);
+        if (personaje) {
+          return res.json(personaje);
+        } else {
+          return res.sendStatus(404);
+        }
+      } else if (age) {
+        const personajes = await Personaje.findAll({
+          where: { edad: age },
+          include: [{ model: Peliculaserie, as: "peliculaseries" }],
+        });
+
+        if (personajes) {
+          return res.json(personajes);
+        } else {
+          return res.sendStatus(404);
+        }
+      } else if (movies) {
+        const personajes = await Personaje.findAll({
+          include: [
+            {
+              model: Peliculaserie,
+              as: "peliculaseries",
+              where: { id: movies },
+            },
+          ],
+        });
+
+        if (personajes) {
+          return res.json(personajes);
+        } else {
+          return res.sendStatus(404);
+        }
       } else {
-        return res.sendStatus(404);
-      }
-    } else if (age) {
-      const personajes = await Personaje.findAll({
-        where: { edad: age },
-        include: [{ model: Peliculaserie, as: "peliculaseries" }],
-      });
-
-      if (personajes) {
+        const personajes = await Personaje.findAll();
         return res.json(personajes);
-      } else {
-        return res.sendStatus(404);
-      }
-    } else if (movies) {
-      const personajes = await Personaje.findAll({
-        include: [
-          { model: Peliculaserie, as: "peliculaseries", where: { id: movies } },
-        ],
-      });
-
-      if (personajes) {
-        return res.json(personajes);
-      } else {
-        return res.sendStatus(404);
       }
     } else {
-      const personajes = await Personaje.findAll();
-      return res.json(personajes);
+      res.sendStatus(401);
     }
   } catch {
     res.sendStatus(500);
@@ -57,29 +65,33 @@ server.post("/", async (req, res) => {
   const { imagen, nombre, edad, peso, historia } = req.body;
 
   try {
-    if (imagen && isUrl(imagen) && nombre && edad && peso && historia) {
-      //Capitalizamos la primera letra de cada palabra
-      const nombrePropio = nombreCapitalizado(nombre);
+    if (req.user) {
+      if (imagen && isUrl(imagen) && nombre && edad && peso && historia) {
+        //Capitalizamos la primera letra de cada palabra
+        const nombrePropio = nombreCapitalizado(nombre);
 
-      const yaExiste = await Personaje.findOne({
-        where: {
-          nombre: nombrePropio,
-        },
-      });
-      if (!yaExiste) {
-        const nuevoPersonaje = await Personaje.create({
-          imagen: imagen,
-          nombre: nombrePropio,
-          edad: edad,
-          peso: peso,
-          historia: historia,
+        const yaExiste = await Personaje.findOne({
+          where: {
+            nombre: nombrePropio,
+          },
         });
-        return res.sendStatus(201); //Recurso creado
+        if (!yaExiste) {
+          const nuevoPersonaje = await Personaje.create({
+            imagen: imagen,
+            nombre: nombrePropio,
+            edad: edad,
+            peso: peso,
+            historia: historia,
+          });
+          return res.sendStatus(201); //Recurso creado
+        } else {
+          return res.sendStatus(400); //Faltaron parametros
+        }
       } else {
-        return res.sendStatus(400); //Faltaron parametros
+        return res.sendStatus(409); //El recurso a crear ya existia
       }
     } else {
-      return res.sendStatus(409); //El recurso a crear ya existia
+      res.sendStatus(401);
     }
   } catch {
     return res.sendStatus(500);
@@ -89,15 +101,19 @@ server.post("/", async (req, res) => {
 server.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const personaje = await Personaje.findOne({
-      where: { id: id },
-      include: [{ model: Peliculaserie, as: "peliculaseries" }],
-    });
+    if (req.user) {
+      const personaje = await Personaje.findOne({
+        where: { id: id },
+        include: [{ model: Peliculaserie, as: "peliculaseries" }],
+      });
 
-    if (personaje) {
-      return res.json(personaje);
+      if (personaje) {
+        return res.json(personaje);
+      } else {
+        return res.sendStatus(404);
+      }
     } else {
-      return res.sendStatus(404);
+      res.sendStatus(401);
     }
   } catch {
     res.sendStatus(500);
@@ -109,39 +125,43 @@ server.put("/:id", async (req, res) => {
   const { imagen, nombre, edad, peso, historia } = req.body;
 
   try {
-    const siExiste = await Personaje.findOne({ where: { id: id } });
+    if (req.user) {
+      const siExiste = await Personaje.findOne({ where: { id: id } });
 
-    if (siExiste) {
-      //validamos los parametros necesarios
-      if (imagen && isUrl(imagen) && nombre) {
-        const nombrePropio = nombreCapitalizado(nombre);
-        const actualizado = await Personaje.update(
-          { imagen, edad, nombre: nombrePropio, peso, historia },
-          { where: { id: id } }
-        );
-        return res.sendStatus(200);
-      } else if (imagen && isUrl(imagen)) {
-        const actualizado = await Personaje.update(
-          { imagen, edad, peso, historia },
-          { where: { id: id } }
-        );
-        return res.sendStatus(200);
-      } else if (nombre) {
-        const nombrePropio = nombreCapitalizado(nombre);
-        const actualizado = await Personaje.update(
-          { edad, nombre: nombrePropio, peso, historia },
-          { where: { id: id } }
-        );
-        return res.sendStatus(200);
+      if (siExiste) {
+        //validamos los parametros necesarios
+        if (imagen && isUrl(imagen) && nombre) {
+          const nombrePropio = nombreCapitalizado(nombre);
+          const actualizado = await Personaje.update(
+            { imagen, edad, nombre: nombrePropio, peso, historia },
+            { where: { id: id } }
+          );
+          return res.sendStatus(200);
+        } else if (imagen && isUrl(imagen)) {
+          const actualizado = await Personaje.update(
+            { imagen, edad, peso, historia },
+            { where: { id: id } }
+          );
+          return res.sendStatus(200);
+        } else if (nombre) {
+          const nombrePropio = nombreCapitalizado(nombre);
+          const actualizado = await Personaje.update(
+            { edad, nombre: nombrePropio, peso, historia },
+            { where: { id: id } }
+          );
+          return res.sendStatus(200);
+        } else {
+          const actualizado = await Personaje.update(
+            { edad, peso, historia },
+            { where: { id: id } }
+          );
+          return res.sendStatus(200);
+        }
       } else {
-        const actualizado = await Personaje.update(
-          { edad, peso, historia },
-          { where: { id: id } }
-        );
-        return res.sendStatus(200);
+        return res.sendStatus(404); //El recurso no fue encontrado
       }
     } else {
-      return res.sendStatus(404); //El recurso no fue encontrado
+      res.sendStatus(401);
     }
   } catch {
     return res.sendStatus(500); //Hubo un error en la actualizacion
@@ -152,13 +172,17 @@ server.delete("/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const existe = await Personaje.findOne({ where: { id: id } });
+    if (req.user) {
+      const existe = await Personaje.findOne({ where: { id: id } });
 
-    if (existe) {
-      const eliminado = Personaje.destroy({ where: { id: id } });
-      return res.sendStatus(200); //Recurso eliminado
+      if (existe) {
+        const eliminado = Personaje.destroy({ where: { id: id } });
+        return res.sendStatus(200); //Recurso eliminado
+      } else {
+        return res.sendStatus(404); //recurso no encotrado
+      }
     } else {
-      return res.sendStatus(404); //recurso no encotrado
+      res.sendStatus(401);
     }
   } catch {
     return res.sendStatus(500); //error en db
@@ -169,11 +193,15 @@ server.delete("/:id", async (req, res) => {
 server.post("/:idPersonaje/movie/:idMovie", async (req, res) => {
   const { idPersonaje, idMovie } = req.params;
   try {
-    const crearRelacion = await PersonajesPelicula.create({
-      personajeId: idPersonaje,
-      peliculaserieId: idMovie,
-    });
-    return res.sendStatus(201);
+    if (req.user) {
+      const crearRelacion = await PersonajesPelicula.create({
+        personajeId: idPersonaje,
+        peliculaserieId: idMovie,
+      });
+      return res.sendStatus(201);
+    } else {
+      res.sendStatus(401);
+    }
   } catch {
     return res.sendStatus(500);
   }

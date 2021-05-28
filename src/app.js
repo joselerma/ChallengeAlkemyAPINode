@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 const moment = require("moment");
 const routes = require("./routes/index.js");
 const passport = require("./helpers/passport");
-const { FRONT_END } = process.env;
+const { FRONT_END, FIRMA } = process.env;
 
 const server = express();
 
@@ -37,7 +37,7 @@ server.all("*", function (req, res, next) {
     req.headers.authorization.replace(/['"]+/g, "");
   token = token && token.slice(7, token.length - 1);
   if (token) {
-    let payload = jwt.decode(token, firma);
+    let payload = jwt.decode(token, FIRMA);
     if (payload && payload.exp <= moment().unix()) {
       return res.status(401).send({ message: "Token expirado" });
     }
